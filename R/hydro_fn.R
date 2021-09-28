@@ -13,26 +13,33 @@ locateGage <- function(siteNumber, startDate, endDate){
   # check the dates to see if they are properly formatted
   startDate <- lubridate::parse_date_time(startDate, orders="ymd")
   endDate <- lubridate::parse_date_time(endDate, orders="ymd")
-  endDate > Sys.Date()
+  if(endDate > Sys.Date()){
+    cat(paste(endDate, " is beyond the current date.", sep=""))
+  } else {
+    cat()
+  }
   
   siteINFO <<- dataRetrieval::readNWISsite(siteNumber)
   
+  cat(paste("The selected site is ", siteINFO$station_nm," (",siteINFO$site_no,").", sep=""))
+  
   # check to see that the gage has data within your study window
-  whatData <<-dataRetrieval::whatNWISdata(siteNumber=siteNumber, parameterCd=c("00060","00065"), service="uv") # 
+  whatData <<-dataRetrieval::whatNWISdata(siteNumber=siteNumber, parameterCd=c("00060","00065"), service="uv") # 00060 = discharge/flow; 00065 = gage height (feet)
   for(i in 1:nrow(whatData)){
+    pcode <- ifelse(whatData$parm_cd[i]=="00060","Flow","Gage height")
     if(whatData$begin_date[i]<startDate&whatData$end_date[i]>endDate){
-      cat(paste(whatData$parm_cd[i],"Data is available for the range of your study period\n",sep=" "))
+      cat(paste(pcode, " (", whatData$parm_cd[i],") " ,"data is available for the range of your study period\n",sep=""))
     } else if(whatData$begin_date[i]<startDate&whatData$end_date[i]<endDate) {
-      cat(paste(whatData$parm_cd[i],"Data is not available for the end of your study period\n",sep=" "))
+      cat(paste(pcode, " (", whatData$parm_cd[i],") " ,"data is not available for the end of your study period\n",sep=""))
     } else if(whatData$begin_date[i]>startDate&whatData$end_date[i]>endDate) {
-      cat(paste(whatData$parm_cd[i],"Data is not available for the beginning of your study period\n",sep=" "))
+      cat(paste(pcode, " (", whatData$parm_cd[i],") " ,"data is not available for the beginning of your study period\n",sep=""))
     } else {
-      cat(paste(whatData$parm_cd[i],"Data is not available for any portion of your study period from this gage\n",sep=" "))
+      cat(paste(pcode, " (", whatData$parm_cd[i],") " ,"data is not available for any portion of your study period from this gage\n",sep=""))
     }
     
   }
   
-  # look up timezone of the gage
+    # look up timezone of the gage
   tz <<- lutz::tz_lookup_coords(siteINFO$dec_lat_va, siteINFO$dec_long_va, method="accurate", warn=FALSE)
   
   # HOW do we find the closest Upstream gage????
@@ -74,7 +81,7 @@ getHydroData <- function(siteNumber,graphtype, startDate, endDate, tz){
   #dischargeUnit$dateTime <- lubridate::date(dischargeUnit$dateTime) # remove the timzone
   dischargeUnit <<- dischargeUnit
 
-  # this produces a hydrograph to examine to make sure we're looking at teh right data
+  # this produces a hydrograph to examine to make sure we're looking at the right data
   ggplot2::ggplot(dischargeUnit, ggplot2::aes_string(x="dateTime", y=flowVar)) +
     ggplot2::ggtitle(paste(siteINFO$station_nm," (",siteINFO$site_no,")", sep="")) +
     ggplot2::xlab("Date") +

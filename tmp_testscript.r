@@ -12,9 +12,7 @@ outputDirectory <- ""
 locateGage(siteNumber, startDate, endDate) 
 
 # select what type of graph you want to make
-graphtype <- "height"#"discharge" #"height"#
-
-
+graphtype <- "discharge" #"discharge" #"height"#
 
 getHydroData(siteNumber, graphtype, startDate, endDate, tz)
 
