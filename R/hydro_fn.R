@@ -1,26 +1,43 @@
 
 
 ######################################################################################################################
-# function to find the local gage
-locateGage <- function(siteNumber){
+#' function to find the local gage
+#'
+#' This function loads a file as a matrix. It assumes that the first column
+#'
+#' @param siteNumber Path to the input file
+#' @param startDate
+#' @param endDate
+#' @export
+locateGage <- function(siteNumber, startDate, endDate){
+  # check the dates to see if they are properly formatted
+  startDate <- lubridate::parse_date_time(startDate, orders="ymd")
+  endDate <- lubridate::parse_date_time(endDate, orders="ymd")
+  endDate > Sys.Date()
+  
   siteINFO <<- dataRetrieval::readNWISsite(siteNumber)
   
   # check to see that the gage has data within your study window
   whatData <<-dataRetrieval::whatNWISdata(siteNumber=siteNumber, parameterCd=c("00060","00065"), service="uv") # 
-
   for(i in 1:nrow(whatData)){
     if(whatData$begin_date[i]<startDate&whatData$end_date[i]>endDate){
       cat(paste(whatData$parm_cd[i],"Data is available for the range of your study period\n",sep=" "))
+    } else if(whatData$begin_date[i]<startDate&whatData$end_date[i]<endDate) {
+      cat(paste(whatData$parm_cd[i],"Data is not available for the end of your study period\n",sep=" "))
+    } else if(whatData$begin_date[i]>startDate&whatData$end_date[i]>endDate) {
+      cat(paste(whatData$parm_cd[i],"Data is not available for the beginning of your study period\n",sep=" "))
+    } else {
+      cat(paste(whatData$parm_cd[i],"Data is not available for any portion of your study period from this gage\n",sep=" "))
     }
+    
   }
   
-    # look up timezone of the gage
+  # look up timezone of the gage
   tz <<- lutz::tz_lookup_coords(siteINFO$dec_lat_va, siteINFO$dec_long_va, method="accurate", warn=FALSE)
   
   # HOW do we find the closest Upstream gage????
   
 }
-
 
 
 #' function to get gage data
@@ -73,12 +90,11 @@ getHydroData <- function(siteNumber,graphtype, startDate, endDate, tz){
 
 }
 
-
-library(dplyr)
-dischargeUnit %>%
-  tidyr::gather(indicator, percentage, c(4:5), -c(1:3, 6)) %>%
-  ggplot2::ggplot(ggplot2::aes(date, percentage, colour = indicator)) + 
-  ggplot2::geom_line(size=1, ggplot2::aes(linetype = lubridate::year(date) >= 2000)) +
-  ggplot2::scale_linetype(guide = F)
+# library(dplyr)
+# dischargeUnit %>%
+#   tidyr::gather(indicator, percentage, c(4:5), -c(1:3, 6)) %>%
+#   ggplot2::ggplot(ggplot2::aes(date, percentage, colour = indicator)) + 
+#   ggplot2::geom_line(size=1, ggplot2::aes(linetype = lubridate::year(date) >= 2000)) +
+#   ggplot2::scale_linetype(guide = F)
 
 
