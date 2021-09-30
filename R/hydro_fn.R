@@ -36,7 +36,6 @@ locateGage <- function(siteNumber, startDate, endDate){
     } else {
       cat(paste(pcode, " (", whatData$parm_cd[i],") " ,"data is not available for any portion of your study period from this gage\n",sep=""))
     }
-    
   }
   
     # look up timezone of the gage
