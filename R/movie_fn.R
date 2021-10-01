@@ -11,6 +11,7 @@
 #' @param outputDirectory
 #' @export
 copyPhotos <- function(startDate, endDate, photoDirectory, outputDirectory){
+  ifelse(!dir.exists(outputDirectory), dir.create(outputDirectory), FALSE)
   ifelse(!dir.exists(paste(outputDirectory,"srcphoto", sep="/")), dir.create(paste(outputDirectory,"srcphoto", sep="/")), FALSE)
   files <- list.files(photoDirectory, recursive=TRUE, pattern="JPG", full.names=FALSE)
   print(paste(length(files),"image files were found in the",photoDirectory, "directory.", sep=" "))
@@ -25,50 +26,29 @@ copyPhotos <- function(startDate, endDate, photoDirectory, outputDirectory){
   files <- files[which(files$mtime_rnd>=as.POSIXct(startDate)&files$mtime_rnd<=as.POSIXct(endDate)),]
   files$suit[files$minutes_rnd==0|files$minutes_rnd==15|files$minutes_rnd==30|files$minutes_rnd==45] <- "suitable"
   files2 <- files[which(files$suit=="suitable"),]
-  files2 <- files2[!duplicated(files2[,c('mtime_rnd')]),] # eliminate any duplicate records
-  file.copy(from=paste(photoDirectory,files2$files, sep="/"), to=paste0(outputDirectory,"/srcphoto"), recursive=FALSE, copy.mode=TRUE)   
+  files2 <<- files2[!duplicated(files2[,c('mtime_rnd')]),] # eliminate any duplicate records
+  invisible(file.copy(from=paste(photoDirectory,files2$files, sep="/"), to=paste0(outputDirectory,"/srcphoto"), recursive=FALSE, copy.mode=TRUE)   )
 }
 
-######################################################################################################################
-#' function to make a movie
-#'
-#' This function...
-#'
-#' @param siteNumber Path to the input file
-#' @param cameraName
-#' @param startDate
-#' @param endDate
-#' @param photoDirectory
-#' @export
-timelapsevid <- function(siteNumber, startDate, endDate, photoDirectory){
-  # make a movie
-  nameVideo <-
-  outputfiles <- list.files(paste(outputDirectory,"output", sep="/"), recursive=TRUE, pattern="jpg", full.names=TRUE)
-  av::av_encode_video(outputfiles, output=paste(outputDirectory, "/", nameVideo,".mp4", sep=""), framerate=12)
-}  
-  
-
-
 
 ######################################################################################################################
-#' function to make a movie
+#' function to make the graphs
 #'
-#' This function...
+#' This function loads a file as a matrix. It assumes that the first column
 #'
 #' @param siteNumber Path to the input file
-#' @param cameraName
 #' @param startDate
 #' @param endDate
-#' @param photoDirectory
 #' @export
-  ts <- seq.POSIXt(as.POSIXct(lubridate::with_tz(startDate, "America/New_York"),'%m/%d/%y %H:%M'), as.POSIXct(lubridate::with_tz(endDate, "America/New_York"),'%m/%d/%y %H:%M'), by=900) # 900 is the number of seconds in 15min
-
-  df <- data.frame(timestamp=ts)
-
-  data_with_missing_times <- dplyr::full_join(df,files2, by=c("timestamp"="mtime_rnd"))
+makeGraphs <- function(siteNumber, startDate, endDate){
+  # figure out the time periods where we don't have a photo
+  # makes a time sequence
+  timestamps <- seq.POSIXt(as.POSIXct(lubridate::with_tz(startDate, tz),'%m/%d/%y %H:%M'), as.POSIXct(lubridate::with_tz(endDate, tz),'%m/%d/%y %H:%M'), by=900) # 900 is the number of seconds in 15min
+  timestamps <- data.frame(timestamp=timestamps)
+  rm(ts)
+  data_with_missing_times <- dplyr::full_join(timestamps,files2, by=c("timestamp"="mtime_rnd"))
 
   getHydroData(siteNumber, graphtype, startDate, endDate, tz)
-
   graphdata <- merge(dischargeUnit, data_with_missing_times, by.x="dateTime", by.y="timestamp") #, all.x=TRUE
 
   # get the number of photos so we can properly pad the file names so things sort correctly...
@@ -81,10 +61,14 @@ timelapsevid <- function(siteNumber, startDate, endDate, photoDirectory){
   df_datemin <- min(graphdata$dateTime)
   df_datemax <- max(graphdata$dateTime)
 
-  exifinfo <- exifr::read_exif(as.character(graphdata$names[40]))  # read the exif data from the camera.
+  exifinfo <- exifr::read_exif(as.character(files2$names[1]))  # read the exif data from the camera.
+  par(mar = c(0,0,0,0))
   jpeg(filename="T:/HydrolapseRpackageDev/testOutput/fillimage1.jpg", width = exifinfo$ExifImageWidth, height = exifinfo$ExifImageHeight, res=72) # units = "px", 
+  plot(c(0, 1), c(0, 1), ann = F, bty = 'n', type = 'n', xaxt = 'n', yaxt = 'n')
+  text(x = 0.5, y = 0.5, paste("No photo available for this time interval.\n"), cex = 7.6, col = "black")
   dev.off()
-
+  par(mar = c(5, 4, 4, 2) + 0.1)
+  
   for(i in 1:nrow(graphdata)){
     graphdata1 <- graphdata[1:i,]
   
@@ -111,13 +95,27 @@ timelapsevid <- function(siteNumber, startDate, endDate, photoDirectory){
       ) +
       #theme(panel.border=element_blank(), panel.grid.major=element_blank(), panel.grid.minor=element_blank(), axis.line=element_line(colour="black"))
       ggplot2::ggsave(filename = paste(outputDirectory,"output", paste0("photo", stringr::str_pad(i, padlength, pad="0"),".jpg"),sep = "/"))
-    print(paste("photo", i, "of", nrow(df), "saved"), sep=" ")
+    print(paste("photo", i, "of", nrow(graphdata), "saved"), sep=" ")
   }
-
-
-
 }
 
 
 
+######################################################################################################################
+#' function to make a movie
+#'
+#' This function...
+#'
+#' @param siteNumber Path to the input file
+#' @param cameraName
+#' @param startDate
+#' @param endDate
+#' @param photoDirectory
+#' @export
+timelapsevid <- function(cameraName, startDate, endDate, outputDirectory){
+  # make a movie
+  nameVideo <- paste(stringi::stri_replace_all_fixed(cameraName, " ", ""), stringi::stri_replace_all_fixed(startDate, "-", ""), stringi::stri_replace_all_fixed(endDate, "-", ""), sep="_")
+  outputfiles <- list.files(paste(outputDirectory,"output", sep="/"), recursive=TRUE, pattern="jpg", full.names=TRUE)
+  av::av_encode_video(outputfiles, output=paste(outputDirectory, "/", nameVideo,".mp4", sep=""), framerate=12)
+}  
 
